@@ -13,7 +13,7 @@ from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampl
   DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
-from model import DeepSpeech, supported_rnns
+from cp_model import DeepSpeech, supported_rnns
 from test import evaluate
 from utils import reduce_tensor, check_loss
 

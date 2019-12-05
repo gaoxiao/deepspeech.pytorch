@@ -1,0 +1,12 @@
+version: '2.3'
+services:
+  deepspeech:
+    runtime: nvidia
+    image: "deepspeech2.docker"
+    stdin_open: true
+    tty: true
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=2
+    volumes:
+      - .:/code
+    command: /bin/bash
