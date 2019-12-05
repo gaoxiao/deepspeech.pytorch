@@ -7,16 +7,17 @@ import time
 import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
-from apex import amp
-from apex.parallel import DistributedDataParallel
-from warpctc_pytorch import CTCLoss
 
-from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
+from apex import amp
+from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
+  DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
 from test import evaluate
 from utils import reduce_tensor, check_loss
+
+# from warpctc_pytorch import CTCLoss
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train-manifest', metavar='DIR',
@@ -77,7 +78,7 @@ parser.add_argument('--rank', default=0, type=int,
 parser.add_argument('--gpu-rank', default=None,
                     help='If using distributed parallel for multi-gpu, sets the GPU for the process')
 parser.add_argument('--seed', default=123456, type=int, help='Seed to generators')
-parser.add_argument('--opt-level', type=str)
+parser.add_argument('--opt-level', default="O1", type=str)
 parser.add_argument('--keep-batchnorm-fp32', type=str, default=None)
 parser.add_argument('--loss-scale', type=str, default=None)
 
@@ -213,12 +214,13 @@ if __name__ == '__main__':
                                       opt_level=args.opt_level,
                                       keep_batchnorm_fp32=args.keep_batchnorm_fp32,
                                       loss_scale=args.loss_scale)
-    if args.distributed:
-        model = DistributedDataParallel(model)
+    # if args.distributed:
+    #     model = DistributedDataParallel(model)
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
+    exit()
 
-    criterion = CTCLoss()
+    # criterion = CTCLoss()
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
