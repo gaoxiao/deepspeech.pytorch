@@ -9,7 +9,7 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 
 from apex import amp
-from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
+from data.cp_data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
   DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
