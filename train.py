@@ -34,7 +34,7 @@ parser.add_argument('--labels-path', default='labels.json', help='Contains all c
 parser.add_argument('--window-size', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--window-stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
-parser.add_argument('--hidden-size', default=800, type=int, help='Hidden size of RNNs')
+parser.add_argument('--hidden-size', default=2048, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden-layers', default=5, type=int, help='Number of RNN layers')
 parser.add_argument('--rnn-type', default='gru', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
@@ -48,7 +48,7 @@ parser.add_argument('--checkpoint', dest='checkpoint', action='store_true', help
 parser.add_argument('--checkpoint-per-batch', default=0, type=int, help='Save checkpoint per batch. 0 means never save')
 parser.add_argument('--visdom', dest='visdom', action='store_true', help='Turn on visdom graphing')
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
-parser.add_argument('--log-dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
+parser.add_argument('--log-dir', default='visualize/ds', help='Location of tensorboard log')
 parser.add_argument('--log-params', dest='log_params', action='store_true', help='Log parameter values and gradients')
 parser.add_argument('--id', default='Deepspeech training', help='Identifier for visdom/tensorboard run')
 parser.add_argument('--save-folder', default='models/', help='Location to save epoch models')
@@ -283,7 +283,7 @@ if __name__ == '__main__':
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
+                      'Loss {loss.val:.6f} ({loss.avg:.6f})\t'.format(
                     (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
@@ -299,7 +299,7 @@ if __name__ == '__main__':
         epoch_time = time.time() - start_epoch_time
         print('Training Summary Epoch: [{0}]\t'
               'Time taken (s): {epoch_time:.0f}\t'
-              'Average Loss {loss:.3f}\t'.format(epoch + 1, epoch_time=epoch_time, loss=avg_loss))
+              'Average Loss {loss:.6f}\t'.format(epoch + 1, epoch_time=epoch_time, loss=avg_loss))
 
         start_iter = 0  # Reset start iteration for next epoch
         with torch.no_grad():
@@ -312,7 +312,7 @@ if __name__ == '__main__':
         loss_results[epoch] = avg_loss
         val_loss_results[epoch] = val_avg_loss
         print('Validation Summary Epoch: [{0}]\t'
-              'Average Val Loss {loss:.3f}\t'.format(epoch + 1, loss=val_avg_loss))
+              'Average Val Loss {loss:.6f}\t'.format(epoch + 1, loss=val_avg_loss))
 
         values = {
             'loss_results': loss_results,

@@ -171,17 +171,19 @@ class DeepSpeech(nn.Module):
                            bidirectional=bidirectional)
             rnns.append(('%d' % (x + 1), rnn))
         self.rnns = nn.Sequential(OrderedDict(rnns))
-        self.lookahead = nn.Sequential(
-            # consider adding batch norm?
-            Lookahead(rnn_hidden_size, context=context),
-            nn.Hardtanh(0, 20, inplace=True)
-        ) if not bidirectional else None
+
+        # self.lookahead = nn.Sequential(
+        #     # consider adding batch norm?
+        #     Lookahead(rnn_hidden_size, context=context),
+        #     nn.Hardtanh(0, 20, inplace=True)
+        # ) if not bidirectional else None
 
         self.fc = nn.Sequential(
             nn.BatchNorm1d(rnn_hidden_size),
             nn.Linear(rnn_hidden_size, 2048, bias=False),
             nn.BatchNorm1d(2048),
             nn.ReLU(),
+            nn.Dropout(p=0.2),
             nn.Linear(2048, num_classes, bias=False),
         )
         self.inference_softmax = InferenceBatchSoftmax()

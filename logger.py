@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import torch
@@ -36,6 +37,8 @@ class VisdomLogger(object):
 
 class TensorBoardLogger(object):
     def __init__(self, id, log_dir, log_params):
+        dt_string = datetime.datetime.now().strftime("%d-%m_%H:%M")
+        log_dir = os.path.join(log_dir, dt_string)
         os.makedirs(log_dir, exist_ok=True)
         from tensorboardX import SummaryWriter
         self.id = id
