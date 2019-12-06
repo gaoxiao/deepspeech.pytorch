@@ -9,35 +9,6 @@ warnings.simplefilter('ignore')
 import torch
 
 from data.data_loader import SpectrogramParser
-import os.path
-
-
-def decode_results(decoded_output, decoded_offsets):
-    results = {
-        "output": [],
-        "_meta": {
-            "acoustic_model": {
-                "name": os.path.basename(args.model_path)
-            },
-            "language_model": {
-                "name": os.path.basename(args.lm_path) if args.lm_path else None,
-            },
-            "decoder": {
-                "lm": args.lm_path is not None,
-                "alpha": args.alpha if args.lm_path is not None else None,
-                "beta": args.beta if args.lm_path is not None else None,
-                "type": args.decoder,
-            }
-        }
-    }
-
-    for b in range(len(decoded_output)):
-        for pi in range(min(args.top_paths, len(decoded_output[b]))):
-            result = {'transcription': decoded_output[b][pi]}
-            if args.offsets:
-                result['offsets'] = decoded_offsets[b][pi].tolist()
-            results['output'].append(result)
-    return results
 
 
 def infer(audio_path, spect_parser, model, device, use_half):
@@ -66,7 +37,7 @@ if __name__ == '__main__':
 
     spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
 
-    audio_path = 'data/audios/90c7cb3d-3455-4de4-a012-cd1790e3c7b9.wav'
+    audio_path = '/home/xiao/code/ai_utils/experiment/child_det/audios/8f4d3b65-927e-4722-a794-d8037d6b561b.wav'
     val, idx = infer(
         # audio_path=args.audio_path,
         audio_path=audio_path,
