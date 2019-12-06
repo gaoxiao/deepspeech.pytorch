@@ -13,8 +13,10 @@ if __name__ == '__main__':
 
     data = []
     for l in child_data:
+        l = l.replace('/home/gaoxiao/code/ai_utils/experiment/child_det/audios/', 'data/audios/')
         data.append('{},{}\n'.format(l.strip(), 1))
     for l in parent_data:
+        l = l.replace('/home/gaoxiao/code/ai_utils/experiment/child_det/audios/', 'data/audios/')
         data.append('{},{}\n'.format(l.strip(), 2))
 
     random.shuffle(data)

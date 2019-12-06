@@ -98,7 +98,8 @@ class BatchRNN(nn.Module):
         x, _ = nn.utils.rnn.pad_packed_sequence(x)
         if self.bidirectional:
             x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxH*2) -> (TxNxH) by sum
-        return x
+            h = h.sum(0)  # (2xNxH) -> (NxH) by sum
+        return x, h
 
 
 class Lookahead(nn.Module):
@@ -183,6 +184,12 @@ class DeepSpeech(nn.Module):
         self.fc = nn.Sequential(
             SequenceWise(fully_connected),
         )
+
+        h_fully_connected = nn.Sequential(
+            nn.BatchNorm1d(rnn_hidden_size),
+            nn.Linear(rnn_hidden_size, num_classes, bias=False)
+        )
+        self.h_fc = h_fully_connected
         self.inference_softmax = InferenceBatchSoftmax()
 
     def forward(self, x, lengths):
@@ -194,17 +201,21 @@ class DeepSpeech(nn.Module):
         x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])  # Collapse feature dimension
         x = x.transpose(1, 2).transpose(0, 1).contiguous()  # TxNxH
 
+        h = None
         for rnn in self.rnns:
-            x = rnn(x, output_lengths)
+            x, h = rnn(x, output_lengths)
 
         if not self.bidirectional:  # no need for lookahead layer in bidirectional
             x = self.lookahead(x)
 
         x = self.fc(x)
         x = x.transpose(0, 1)
+
+        h = self.h_fc(h)
         # identity in training mode, softmax in eval mode
         x = self.inference_softmax(x)
-        return x, output_lengths
+        h = self.inference_softmax(h)
+        return x, h, output_lengths
 
     def get_seq_lens(self, input_length):
         """
@@ -246,7 +257,7 @@ class DeepSpeech(nn.Module):
 
     @staticmethod
     def serialize(model, optimizer=None, epoch=None, iteration=None, loss_results=None,
-                  cer_results=None, wer_results=None, avg_loss=None, meta=None):
+                  val_loss_results=None, avg_loss=None, meta=None):
         package = {
             'version': model.version,
             'hidden_size': model.hidden_size,
@@ -267,8 +278,7 @@ class DeepSpeech(nn.Module):
             package['iteration'] = iteration
         if loss_results is not None:
             package['loss_results'] = loss_results
-            package['cer_results'] = cer_results
-            package['wer_results'] = wer_results
+            package['val_loss_results'] = val_loss_results
         if meta is not None:
             package['meta'] = meta
         return package

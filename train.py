@@ -9,6 +9,8 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 
 from apex import amp
+from torch.nn import CrossEntropyLoss
+
 from data.cp_data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
   DistributedBucketingSampler
 from decoder import GreedyDecoder
@@ -26,7 +28,8 @@ parser.add_argument('--val-manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/val_manifest.csv')
 parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch-size', default=20, type=int, help='Batch size for training')
-parser.add_argument('--num-workers', default=4, type=int, help='Number of workers used in data-loading')
+# TODO: revert workers to 4
+parser.add_argument('--num-workers', default=0, type=int, help='Number of workers used in data-loading')
 parser.add_argument('--labels-path', default='labels.json', help='Contains all characters for transcription')
 parser.add_argument('--window-size', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--window-stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
@@ -131,9 +134,8 @@ if __name__ == '__main__':
     save_folder = args.save_folder
     os.makedirs(save_folder, exist_ok=True)  # Ensure save folder exists
 
-    loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
-        args.epochs)
-    best_wer = None
+    loss_results, val_loss_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs)
+    best_val_loss = None
     if main_proc and args.visdom:
         visdom_logger = VisdomLogger(args.id, args.epochs)
     if main_proc and args.tensorboard:
@@ -210,17 +212,18 @@ if __name__ == '__main__':
     if optim_state is not None:
         optimizer.load_state_dict(optim_state)
 
-    model, optimizer = amp.initialize(model, optimizer,
-                                      opt_level=args.opt_level,
-                                      keep_batchnorm_fp32=args.keep_batchnorm_fp32,
-                                      loss_scale=args.loss_scale)
-    # if args.distributed:
+    if args.cuda:
+        model, optimizer = amp.initialize(model, optimizer,
+                                          opt_level=args.opt_level,
+                                          keep_batchnorm_fp32=args.keep_batchnorm_fp32,
+                                          loss_scale=args.loss_scale)
+        # if args.distributed:
     #     model = DistributedDataParallel(model)
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
-    exit()
 
     # criterion = CTCLoss()
+    criterion = CrossEntropyLoss()
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -232,17 +235,22 @@ if __name__ == '__main__':
         for i, (data) in enumerate(train_loader, start=start_iter):
             if i == len(train_sampler):
                 break
-            inputs, targets, input_percentages, target_sizes = data
+            inputs, targets, input_percentages = data
             input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
             # measure data loading time
             data_time.update(time.time() - end)
             inputs = inputs.to(device)
+            targets = targets.long().to(device)
 
-            out, output_sizes = model(inputs, input_sizes)
+            out, hidden, output_sizes = model(inputs, input_sizes)
             out = out.transpose(0, 1)  # TxNxH
 
             float_out = out.float()  # ensure float32 for loss
-            loss = criterion(float_out, targets, output_sizes, target_sizes).to(device)
+            hidden_out = hidden.float()  # ensure float32 for loss
+            # loss = criterion(float_out, targets, output_sizes).to(device)
+
+            loss = criterion(hidden_out, targets).to(device)
+
             loss = loss / inputs.size(0)  # average the loss by minibatch
 
             if args.distributed:
@@ -283,7 +291,7 @@ if __name__ == '__main__':
                 print("Saving checkpoint model to %s" % file_path)
                 torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
                                                 loss_results=loss_results,
-                                                wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
+                                                val_loss_results=val_loss_results, avg_loss=avg_loss),
                            file_path)
             del loss, out, float_out
 
@@ -296,23 +304,20 @@ if __name__ == '__main__':
 
         start_iter = 0  # Reset start iteration for next epoch
         with torch.no_grad():
-            wer, cer, output_data = evaluate(test_loader=test_loader,
+            val_avg_loss, output_data = evaluate(test_loader=test_loader,
                                              device=device,
                                              model=model,
+                                             criterion=criterion,
                                              decoder=decoder,
                                              target_decoder=decoder)
         loss_results[epoch] = avg_loss
-        wer_results[epoch] = wer
-        cer_results[epoch] = cer
+        val_loss_results[epoch] = val_avg_loss
         print('Validation Summary Epoch: [{0}]\t'
-              'Average WER {wer:.3f}\t'
-              'Average CER {cer:.3f}\t'.format(
-            epoch + 1, wer=wer, cer=cer))
+              'Average Val Loss {loss:.3f}\t'.format(epoch + 1, loss=val_avg_loss))
 
         values = {
             'loss_results': loss_results,
-            'cer_results': cer_results,
-            'wer_results': wer_results
+            'val_loss_results': val_loss_results,
         }
         if args.visdom and main_proc:
             visdom_logger.update(epoch, values)
@@ -320,26 +325,25 @@ if __name__ == '__main__':
             tensorboard_logger.update(epoch, values, model.named_parameters())
             values = {
                 'Avg Train Loss': avg_loss,
-                'Avg WER': wer,
-                'Avg CER': cer
+                'Avg Val Loss': val_avg_loss,
             }
 
         if main_proc and args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results),
+                                            val_loss_results=val_loss_results),
                        file_path)
         # anneal lr
         for g in optimizer.param_groups:
             g['lr'] = g['lr'] / args.learning_anneal
         print('Learning rate annealed to: {lr:.6f}'.format(lr=g['lr']))
 
-        if main_proc and (best_wer is None or best_wer > wer):
+        if main_proc and (best_val_loss is None or best_val_loss > val_avg_loss):
             print("Found better validated model, saving to %s" % args.model_path)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results)
+                                            val_loss_results=val_loss_results)
                        , args.model_path)
-            best_wer = wer
+            best_val_loss = val_avg_loss
             avg_loss = 0
 
         if not args.no_shuffle:
