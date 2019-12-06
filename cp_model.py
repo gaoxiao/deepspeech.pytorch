@@ -181,15 +181,7 @@ class DeepSpeech(nn.Module):
             nn.BatchNorm1d(rnn_hidden_size),
             nn.Linear(rnn_hidden_size, num_classes, bias=False)
         )
-        self.fc = nn.Sequential(
-            SequenceWise(fully_connected),
-        )
-
-        h_fully_connected = nn.Sequential(
-            nn.BatchNorm1d(rnn_hidden_size),
-            nn.Linear(rnn_hidden_size, num_classes, bias=False)
-        )
-        self.h_fc = h_fully_connected
+        self.fc = fully_connected
         self.inference_softmax = InferenceBatchSoftmax()
 
     def forward(self, x, lengths):
@@ -205,17 +197,17 @@ class DeepSpeech(nn.Module):
         for rnn in self.rnns:
             x, h = rnn(x, output_lengths)
 
-        if not self.bidirectional:  # no need for lookahead layer in bidirectional
-            x = self.lookahead(x)
+        # if not self.bidirectional:  # no need for lookahead layer in bidirectional
+        #     x = self.lookahead(x)
+        #
+        # x = self.fc(x)
+        # x = x.transpose(0, 1)
+        # # identity in training mode, softmax in eval mode
+        # x = self.inference_softmax(x)
 
-        x = self.fc(x)
-        x = x.transpose(0, 1)
-
-        h = self.h_fc(h)
-        # identity in training mode, softmax in eval mode
-        x = self.inference_softmax(x)
+        h = self.fc(h)
         h = self.inference_softmax(h)
-        return x, h, output_lengths
+        return None, h, None
 
     def get_seq_lens(self, input_length):
         """

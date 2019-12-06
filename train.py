@@ -242,13 +242,12 @@ if __name__ == '__main__':
             inputs = inputs.to(device)
             targets = targets.long().to(device)
 
-            out, hidden, output_sizes = model(inputs, input_sizes)
-            out = out.transpose(0, 1)  # TxNxH
-
-            float_out = out.float()  # ensure float32 for loss
-            hidden_out = hidden.float()  # ensure float32 for loss
+            _, hidden, _ = model(inputs, input_sizes)
+            # out = out.transpose(0, 1)  # TxNxH
+            # float_out = out.float()  # ensure float32 for loss
             # loss = criterion(float_out, targets, output_sizes).to(device)
 
+            hidden_out = hidden.float()  # ensure float32 for loss
             loss = criterion(hidden_out, targets).to(device)
 
             loss = loss / inputs.size(0)  # average the loss by minibatch
@@ -293,7 +292,7 @@ if __name__ == '__main__':
                                                 loss_results=loss_results,
                                                 val_loss_results=val_loss_results, avg_loss=avg_loss),
                            file_path)
-            del loss, out, float_out
+            del hidden_out
 
         avg_loss /= len(train_sampler)
 

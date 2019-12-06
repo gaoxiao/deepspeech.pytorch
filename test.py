@@ -1,11 +1,9 @@
 import argparse
 
-import numpy as np
 import torch
 from tqdm import tqdm
 
 from data.cp_data_loader import SpectrogramDataset, AudioDataLoader
-from decoder import GreedyDecoder
 from opts import add_decoder_args, add_inference_args
 from utils import load_model
 
@@ -38,12 +36,12 @@ def evaluate(test_loader, device, model, criterion, decoder, target_decoder, sav
         # unflatten targets
         split_targets = []
 
-        out, hidden, output_sizes = model(inputs, input_sizes)
+        _, hidden, _ = model(inputs, input_sizes)
         hidden_out = hidden.float()  # ensure float32 for loss
 
         if save_output is not None:
             # add output to data array, and continue
-            output_data.append((out.cpu().numpy(), hidden, output_sizes.numpy()))
+            output_data.append(hidden)
 
         loss = criterion(hidden_out, targets).to(device)
         loss = loss / inputs.size(0)  # average the loss by minibatch

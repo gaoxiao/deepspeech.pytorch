@@ -47,7 +47,7 @@ def infer(audio_path, spect_parser, model, device, use_half):
     if use_half:
         spect = spect.half()
     input_sizes = torch.IntTensor([spect.size(3)]).int()
-    out, hidden, output_sizes = model(spect, input_sizes)
+    _, hidden, _ = model(spect, input_sizes)
     hidden_out = hidden.float()
 
     return hidden_out.max(1)
