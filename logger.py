@@ -59,6 +59,10 @@ class TensorBoardLogger(object):
                 self.tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
         self.tensorboard_writer.flush()
 
+    def log_step(self, step, values):
+        self.tensorboard_writer.add_scalars(self.id + '_loss', values, step)
+        self.tensorboard_writer.flush()
+
     def load_previous_values(self, start_epoch, values):
         loss_results = values["loss_results"][:start_epoch]
         val_loss_results = values["val_loss_results"][:start_epoch]

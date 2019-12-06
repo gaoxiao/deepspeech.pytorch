@@ -12,7 +12,7 @@ from apex import amp
 from torch.nn import CrossEntropyLoss
 
 from data.cp_data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
-  DistributedBucketingSampler
+    DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from cp_model import DeepSpeech, supported_rnns
@@ -50,7 +50,7 @@ parser.add_argument('--visdom', dest='visdom', action='store_true', help='Turn o
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
 parser.add_argument('--log-dir', default='visualize/ds', help='Location of tensorboard log')
 parser.add_argument('--log-params', dest='log_params', action='store_true', help='Log parameter values and gradients')
-parser.add_argument('--id', default='Deepspeech training', help='Identifier for visdom/tensorboard run')
+parser.add_argument('--id', default='Deepspeech', help='Identifier for visdom/tensorboard run')
 parser.add_argument('--save-folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--model-path', default='models/deepspeech_final.pth',
                     help='Location to save best validation model')
@@ -285,6 +285,11 @@ if __name__ == '__main__':
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.6f} ({loss.avg:.6f})\t'.format(
                     (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
+
+            if args.tensorboard and main_proc:
+                tensorboard_logger.log_step(epoch * len(train_sampler) + i,
+                                            {'loss': losses.val, 'avg_loss': losses.avg})
+
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
@@ -304,11 +309,11 @@ if __name__ == '__main__':
         start_iter = 0  # Reset start iteration for next epoch
         with torch.no_grad():
             val_avg_loss, output_data = evaluate(test_loader=test_loader,
-                                             device=device,
-                                             model=model,
-                                             criterion=criterion,
-                                             decoder=decoder,
-                                             target_decoder=decoder)
+                                                 device=device,
+                                                 model=model,
+                                                 criterion=criterion,
+                                                 decoder=decoder,
+                                                 target_decoder=decoder)
         loss_results[epoch] = avg_loss
         val_loss_results[epoch] = val_avg_loss
         print('Validation Summary Epoch: [{0}]\t'
