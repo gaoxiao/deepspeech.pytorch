@@ -177,11 +177,13 @@ class DeepSpeech(nn.Module):
             nn.Hardtanh(0, 20, inplace=True)
         ) if not bidirectional else None
 
-        fully_connected = nn.Sequential(
+        self.fc = nn.Sequential(
             nn.BatchNorm1d(rnn_hidden_size),
-            nn.Linear(rnn_hidden_size, num_classes, bias=False)
+            nn.Linear(rnn_hidden_size, 2048, bias=False),
+            nn.BatchNorm1d(2048),
+            nn.ReLU(),
+            nn.Linear(2048, num_classes, bias=False),
         )
-        self.fc = fully_connected
         self.inference_softmax = InferenceBatchSoftmax()
 
     def forward(self, x, lengths):
