@@ -180,11 +180,14 @@ class DeepSpeech(nn.Module):
 
         self.fc = nn.Sequential(
             nn.BatchNorm1d(rnn_hidden_size),
-            nn.Linear(rnn_hidden_size, 2048, bias=False),
+            nn.Linear(rnn_hidden_size, 2048),
             nn.BatchNorm1d(2048),
             nn.ReLU(),
-            nn.Dropout(p=0.2),
-            nn.Linear(2048, num_classes, bias=False),
+            nn.Linear(2048, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+            # nn.Dropout(p=0.2),
+            nn.Linear(1024, num_classes, bias=False),
         )
         self.inference_softmax = InferenceBatchSoftmax()
 
