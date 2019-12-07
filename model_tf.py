@@ -129,20 +129,17 @@ class Lookahead(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf=None,
-                 bidirectional=True, context=20):
+    def __init__(self, labels="abc", hidden_size=768, nb_layers=5, audio_conf=None, context=20):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
         if audio_conf is None:
             audio_conf = {}
         self.version = '0.0.1'
-        self.hidden_size = rnn_hidden_size
+        self.hidden_size = hidden_size
         self.hidden_layers = nb_layers
-        self.rnn_type = rnn_type
         self.audio_conf = audio_conf or {}
         self.labels = labels
-        self.bidirectional = bidirectional
         # Transformer decoder T.
         self.out_l = 64
 
@@ -163,22 +160,6 @@ class DeepSpeech(nn.Module):
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 20 - 41) / 2 + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32
-
-        # rnns = []
-        # rnn = BatchRNN(input_size=rnn_input_size, hidden_size=rnn_hidden_size, rnn_type=rnn_type,
-        #                bidirectional=bidirectional, batch_norm=False)
-        # rnns.append(('0', rnn))
-        # for x in range(nb_layers - 1):
-        #     rnn = BatchRNN(input_size=rnn_hidden_size, hidden_size=rnn_hidden_size, rnn_type=rnn_type,
-        #                    bidirectional=bidirectional)
-        #     rnns.append(('%d' % (x + 1), rnn))
-        # self.rnns = nn.Sequential(OrderedDict(rnns))
-
-        # self.lookahead = nn.Sequential(
-        #     # consider adding batch norm?
-        #     Lookahead(rnn_hidden_size, context=context),
-        #     nn.Hardtanh(0, 20, inplace=True)
-        # ) if not bidirectional else None
 
         h_size = rnn_input_size * self.out_l
         self.fc = nn.Sequential(
@@ -208,21 +189,10 @@ class DeepSpeech(nn.Module):
 
         tgt = torch.zeros((self.out_l, x.size()[1], x.size()[2])).to(x)
 
-        # h = None
-        # for rnn in self.rnns:
-        #     x, h = rnn(x, output_lengths)
-        # output = h
-
-        # if not self.bidirectional:  # no need for lookahead layer in bidirectional
-        #     x = self.lookahead(x)
-        # x = x.sum(0)  # TxNxH -> NxH
-        # output = torch.cat((x, h), 1)
-
         output = self.transformer(x, tgt)
         output = output.squeeze(0)
-        output = output.transpose(0, 1) # NxTxH
+        output = output.transpose(0, 1)  # NxTxH
         output = output.reshape(output.size()[0], -1)
-
 
         output = self.fc(output)
         output = self.inference_softmax(output)
@@ -244,12 +214,10 @@ class DeepSpeech(nn.Module):
     @classmethod
     def load_model(cls, path):
         package = torch.load(path, map_location=lambda storage, loc: storage)
-        model = cls(rnn_hidden_size=package['hidden_size'],
+        model = cls(hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],
                     labels=package['labels'],
-                    audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True))
+                    audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
         # for x in model.rnns:
         #     x.flatten_parameters()
@@ -257,12 +225,10 @@ class DeepSpeech(nn.Module):
 
     @classmethod
     def load_model_package(cls, package):
-        model = cls(rnn_hidden_size=package['hidden_size'],
+        model = cls(hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],
                     labels=package['labels'],
-                    audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True))
+                    audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
         return model
 
@@ -273,11 +239,9 @@ class DeepSpeech(nn.Module):
             'version': model.version,
             'hidden_size': model.hidden_size,
             'hidden_layers': model.hidden_layers,
-            'rnn_type': supported_rnns_inv.get(model.rnn_type, model.rnn_type.__name__.lower()),
             'audio_conf': model.audio_conf,
             'labels': model.labels,
             'state_dict': model.state_dict(),
-            'bidirectional': model.bidirectional,
         }
         if optimizer is not None:
             package['optim_dict'] = optimizer.state_dict()
@@ -320,7 +284,6 @@ if __name__ == '__main__':
     print("DeepSpeech version: ", model.version)
     print("")
     print("Recurrent Neural Network Properties")
-    print("  RNN Type:         ", model.rnn_type.__name__.lower())
     print("  RNN Layers:       ", model.hidden_layers)
     print("  RNN Size:         ", model.hidden_size)
     print("  Classes:          ", len(model.labels))

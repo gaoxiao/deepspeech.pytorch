@@ -7,21 +7,18 @@ import time
 import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
-
 from apex import amp
 from torch.nn import CrossEntropyLoss
 
 from data.cp_data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
     DistributedBucketingSampler
 from decoder import GreedyDecoder
-from logger import VisdomLogger, TensorBoardLogger
-from cp_model import DeepSpeech, supported_rnns
+from logger import TensorBoardLogger
+from model_tf import DeepSpeech, supported_rnns
 from test import evaluate
 from utils import reduce_tensor, check_loss
 
-# from warpctc_pytorch import CTCLoss
-
-parser = argparse.ArgumentParser(description='DeepSpeech training')
+parser = argparse.ArgumentParser(description='DeepSpeech transformer training')
 parser.add_argument('--train-manifest', metavar='DIR',
                     help='path to train manifest csv', default='data/train_manifest.csv')
 parser.add_argument('--val-manifest', metavar='DIR',
@@ -36,7 +33,6 @@ parser.add_argument('--window-stride', default=.01, type=float, help='Window str
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
 parser.add_argument('--hidden-size', default=2048, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden-layers', default=2, type=int, help='Number of RNN layers')
-parser.add_argument('--rnn-type', default='gru', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
@@ -46,13 +42,12 @@ parser.add_argument('--learning-anneal', default=1.1, type=float, help='Annealin
 parser.add_argument('--silent', dest='silent', action='store_true', help='Turn off progress tracking per iteration')
 parser.add_argument('--checkpoint', dest='checkpoint', action='store_true', help='Enables checkpoint saving of model')
 parser.add_argument('--checkpoint-per-batch', default=0, type=int, help='Save checkpoint per batch. 0 means never save')
-parser.add_argument('--visdom', dest='visdom', action='store_true', help='Turn on visdom graphing')
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
-parser.add_argument('--log-dir', default='visualize/ds', help='Location of tensorboard log')
+parser.add_argument('--log-dir', default='visualize/ds_tf', help='Location of tensorboard log')
 parser.add_argument('--log-params', dest='log_params', action='store_true', help='Log parameter values and gradients')
-parser.add_argument('--id', default='Deepspeech', help='Identifier for visdom/tensorboard run')
-parser.add_argument('--save-folder', default='models/', help='Location to save epoch models')
-parser.add_argument('--model-path', default='models/deepspeech_final.pth',
+parser.add_argument('--id', default='Deepspeech_tf', help='Identifier for visdom/tensorboard run')
+parser.add_argument('--save-folder', default='models_tf/', help='Location to save epoch models')
+parser.add_argument('--model-path', default='models_tf/deepspeech_final.pth',
                     help='Location to save best validation model')
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
@@ -136,8 +131,6 @@ if __name__ == '__main__':
 
     loss_results, val_loss_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs)
     best_val_loss = None
-    if main_proc and args.visdom:
-        visdom_logger = VisdomLogger(args.id, args.epochs)
     if main_proc and args.tensorboard:
         tensorboard_logger = TensorBoardLogger(args.id, args.log_dir, args.log_params)
 
@@ -161,8 +154,6 @@ if __name__ == '__main__':
             loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], \
                                                      package['wer_results']
             best_wer = wer_results[start_epoch]
-            if main_proc and args.visdom:  # Add previous scores to visdom graph
-                visdom_logger.load_previous_values(start_epoch, package)
             if main_proc and args.tensorboard:  # Previous scores to tensorboard logs
                 tensorboard_logger.load_previous_values(start_epoch, package)
     else:
@@ -177,14 +168,10 @@ if __name__ == '__main__':
                           noise_prob=args.noise_prob,
                           noise_levels=(args.noise_min, args.noise_max))
 
-        rnn_type = args.rnn_type.lower()
-        assert rnn_type in supported_rnns, "rnn_type should be either lstm, rnn or gru"
-        model = DeepSpeech(rnn_hidden_size=args.hidden_size,
+        model = DeepSpeech(hidden_size=args.hidden_size,
                            nb_layers=args.hidden_layers,
                            labels=labels,
-                           rnn_type=supported_rnns[rnn_type],
-                           audio_conf=audio_conf,
-                           bidirectional=args.bidirectional)
+                           audio_conf=audio_conf)
 
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
@@ -222,7 +209,6 @@ if __name__ == '__main__':
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 
-    # criterion = CTCLoss()
     criterion = CrossEntropyLoss()
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -323,8 +309,6 @@ if __name__ == '__main__':
             'loss_results': loss_results,
             'val_loss_results': val_loss_results,
         }
-        if args.visdom and main_proc:
-            visdom_logger.update(epoch, values)
         if args.tensorboard and main_proc:
             tensorboard_logger.update(epoch, values, model.named_parameters())
             values = {

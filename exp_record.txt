@@ -57,3 +57,7 @@ Failed to converge.
 Learning rate=0.1
 Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2, Dropout=0.6
 95 103.0 0.9223300970873787
+
+
+TODO:
+transform mask.
