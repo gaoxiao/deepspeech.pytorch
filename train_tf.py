@@ -15,7 +15,7 @@ from data.cp_data_loader import AudioDataLoader, SpectrogramDataset, BucketingSa
 from decoder import GreedyDecoder
 from logger import TensorBoardLogger
 from model_tf import DeepSpeech
-from test import evaluate
+from test_tf import evaluate
 from utils import reduce_tensor, check_loss
 
 parser = argparse.ArgumentParser(description='DeepSpeech transformer training')
