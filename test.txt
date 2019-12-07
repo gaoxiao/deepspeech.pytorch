@@ -1,7 +1,59 @@
-Sequential(
-  (0): SequenceWise (
-  Sequential(
-    (0): BatchNorm1d(800, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (1): Linear(in_features=800, out_features=29, bias=False)
-  ))
-)
+Combine output and hidden. 2 RNN
+84 103.0 0.8155339805825242
+
+
+Only hidden. 2 RNN
+82 103.0 0.7961165048543689
+
+
+Transformer:
+79 103.0 0.7669902912621359
+
+Transformer init state=0:
+77 103.0 0.7475728155339806
+
+Transformer init state=0, decoder T=16:
+83 103.0 0.8058252427184466
+
+Transformer init state=0, decoder T=16, decoder_layer=2, encoder_layer=2
+80 103.0 0.7766990291262136
+
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2
+86 103.0 0.8349514563106796
+
+With mask?
+
+Learning rate=0.03
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2
+90 103.0 0.8737864077669902
+
+
+Adam, no LR anneal
+Learning rate=0.01
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2
+Failed to converge.
+
+
+Learning rate=0.1
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2, Dropout=0.2
+95 103.0 0.9223300970873787
+
+
+Learning rate=0.1
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2, Dropout=0.1
+92 103.0 0.8932038834951457
+
+
+Learning rate=0.1
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2, Dropout=0.5
+96 103.0 0.9320388349514563
+
+
+Learning rate=0.1
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2, Dropout=0.8
+Failed to converge.
+
+
+Learning rate=0.1
+Transformer init state=0, decoder T=64, decoder_layer=2, encoder_layer=2, Dropout=0.6
+95 103.0 0.9223300970873787
