@@ -178,9 +178,10 @@ class DeepSpeech(nn.Module):
         #     nn.Hardtanh(0, 20, inplace=True)
         # ) if not bidirectional else None
 
+        h_size = rnn_hidden_size
         self.fc = nn.Sequential(
-            nn.BatchNorm1d(rnn_hidden_size),
-            nn.Linear(rnn_hidden_size, 2048),
+            nn.BatchNorm1d(h_size),
+            nn.Linear(h_size, 2048),
             nn.BatchNorm1d(2048),
             nn.ReLU(),
             nn.Linear(2048, 1024),
@@ -206,15 +207,14 @@ class DeepSpeech(nn.Module):
 
         # if not self.bidirectional:  # no need for lookahead layer in bidirectional
         #     x = self.lookahead(x)
-        #
-        # x = self.fc(x)
-        # x = x.transpose(0, 1)
-        # # identity in training mode, softmax in eval mode
-        # x = self.inference_softmax(x)
+        # x = x.sum(0)  # TxNxH -> NxH
+        # output = torch.cat((x, h), 1)
 
-        h = self.fc(h)
-        h = self.inference_softmax(h)
-        return None, h, None
+        output = h
+
+        output = self.fc(output)
+        output = self.inference_softmax(output)
+        return None, output, None
 
     def get_seq_lens(self, input_length):
         """
