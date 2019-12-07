@@ -60,8 +60,6 @@ parser.add_argument('--log-params', dest='log_params', action='store_true',
                     help='Log parameter values and gradients')
 parser.add_argument('--id', required=True, help='Identifier for visdom/tensorboard run')
 parser.add_argument('--save-folder', default='models_tf/', help='Location to save epoch models')
-parser.add_argument('--model-path', default='models_tf/deepspeech_final.pth',
-                    help='Location to save best validation model')
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='Finetune the model from checkpoint "continue_from"')
@@ -354,12 +352,12 @@ if __name__ == '__main__':
             g['lr'] = g['lr'] / args.learning_anneal
         print('Learning rate annealed to: {lr:.6f}'.format(lr=g['lr']))
 
+        model_path = 'models/tf_{}.pth'.format(args.id)
         if main_proc and (best_val_loss is None or best_val_loss > val_avg_loss):
-            print("Found better validated model, saving to %s" % args.model_path)
+            print("Found better validated model, saving to %s" % model_path)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch,
                                             loss_results=loss_results,
-                                            val_loss_results=val_loss_results)
-                       , args.model_path)
+                                            val_loss_results=val_loss_results), model_path)
             best_val_loss = val_avg_loss
             avg_loss = 0
 
