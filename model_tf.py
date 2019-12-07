@@ -176,7 +176,7 @@ class DeepSpeech(nn.Module):
         self.inference_softmax = InferenceBatchSoftmax()
 
         self.transformer = nn.Transformer(d_model=rnn_input_size, num_encoder_layers=2, num_decoder_layers=2,
-                                          dropout=0.6)
+                                          dropout=0.5)
 
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
