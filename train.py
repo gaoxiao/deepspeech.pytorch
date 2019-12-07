@@ -287,7 +287,7 @@ if __name__ == '__main__':
                     (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
 
             if args.tensorboard and main_proc:
-                tensorboard_logger.log_step(tensorboard_logger.id + '_loss', epoch * len(train_sampler) + i,
+                tensorboard_logger.log_step('Step Loss', epoch * len(train_sampler) + i,
                                             {'loss': losses.val, 'avg_loss': losses.avg})
 
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
@@ -326,7 +326,7 @@ if __name__ == '__main__':
         if args.visdom and main_proc:
             visdom_logger.update(epoch, values)
         if args.tensorboard and main_proc:
-            tensorboard_logger.update(epoch, values, model.named_parameters())
+            tensorboard_logger.update_loss(epoch, values, model.named_parameters())
             values = {
                 'Avg Train Loss': avg_loss,
                 'Avg Val Loss': val_avg_loss,

@@ -40,8 +40,8 @@ parser.add_argument('--hidden-layers', default=2, type=int, help='Number of RNN 
 parser.add_argument('--dropout', default=0.5, type=float, help='Transformer Dropout')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
-                    help='initial learning rate')
+parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, help='initial learning rate')
+parser.add_argument('--decay', '--decay', default=1e-4, type=float, help='LR decay')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max-norm', default=400, type=int,
                     help='Norm cutoff to prevent explosion of gradients')
@@ -55,10 +55,10 @@ parser.add_argument('--checkpoint-per-batch', default=0, type=int,
                     help='Save checkpoint per batch. 0 means never save')
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_true',
                     help='Turn on tensorboard graphing')
-parser.add_argument('--log-dir', default='visualize/ds_tf', help='Location of tensorboard log')
+parser.add_argument('--log-dir', default='visualize/ds', help='Location of tensorboard log')
 parser.add_argument('--log-params', dest='log_params', action='store_true',
                     help='Log parameter values and gradients')
-parser.add_argument('--id', default='Deepspeech_tf', help='Identifier for visdom/tensorboard run')
+parser.add_argument('--id', required=True, help='Identifier for visdom/tensorboard run')
 parser.add_argument('--save-folder', default='models_tf/', help='Location to save epoch models')
 parser.add_argument('--model-path', default='models_tf/deepspeech_final.pth',
                     help='Location to save best validation model')
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     model = model.to(device)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
-                                momentum=args.momentum, nesterov=True, weight_decay=1e-4)
+                                momentum=args.momentum, nesterov=True, weight_decay=args.decay)
     if optim_state is not None:
         optimizer.load_state_dict(optim_state)
 
@@ -293,14 +293,14 @@ if __name__ == '__main__':
                     data_time=data_time, loss=losses))
 
             if args.tensorboard and main_proc:
-                tensorboard_logger.log_step(tensorboard_logger.id + '_loss',
+                tensorboard_logger.log_step('Step Loss',
                                             epoch * len(train_sampler) + i,
                                             {'loss': losses.val, 'avg_loss': losses.avg})
 
             if args.checkpoint_per_batch > 0 and i > 0 and (
-                i + 1) % args.checkpoint_per_batch == 0 and main_proc:
+                    i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (
-                save_folder, epoch + 1, i + 1)
+                    save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
                 torch.save(
                     DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
@@ -330,15 +330,14 @@ if __name__ == '__main__':
         print('Validation Summary Epoch: [{0}]\t'
               'Average Val Loss {loss:.6f}\tAccuracy {accu:.6f}\t'
               .format(epoch + 1, loss=val_avg_loss, accu=accuracy))
-        tensorboard_logger.log_step(tensorboard_logger.id + '_accuracy', epoch,
-                                    {'accuracy': accuracy})
+        tensorboard_logger.log_step('Accuracy', epoch, {'accuracy': accuracy})
 
         values = {
             'loss_results': loss_results,
             'val_loss_results': val_loss_results,
         }
         if args.tensorboard and main_proc:
-            tensorboard_logger.update(epoch, values, model.named_parameters())
+            tensorboard_logger.update_loss(epoch, values, model.named_parameters())
             values = {
                 'Avg Train Loss': avg_loss,
                 'Avg Val Loss': val_avg_loss,

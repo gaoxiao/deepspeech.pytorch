@@ -37,21 +37,21 @@ class VisdomLogger(object):
 
 class TensorBoardLogger(object):
     def __init__(self, id, log_dir, log_params):
-        dt_string = datetime.datetime.now().strftime("%d-%m_%H:%M")
-        log_dir = os.path.join(log_dir, dt_string)
+        # dt_string = datetime.datetime.now().strftime("%m-%d_%H:%M")
+        log_dir = os.path.join(log_dir, id)
         os.makedirs(log_dir, exist_ok=True)
         from tensorboardX import SummaryWriter
         self.id = id
         self.tensorboard_writer = SummaryWriter(log_dir)
         self.log_params = log_params
 
-    def update(self, epoch, values, parameters=None):
+    def update_loss(self, epoch, values, parameters=None):
         loss, val_loss = values["loss_results"][epoch], values["val_loss_results"][epoch]
         values = {
             'Avg Train Loss': loss,
             'Avg Val Loss': val_loss,
         }
-        self.tensorboard_writer.add_scalars(self.id, values, epoch + 1)
+        self.tensorboard_writer.add_scalars('Epoch Loss', values, epoch + 1)
         if self.log_params:
             for tag, value in parameters():
                 tag = tag.replace('.', '/')
@@ -59,8 +59,8 @@ class TensorBoardLogger(object):
                 self.tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
         self.tensorboard_writer.flush()
 
-    def log_step(self, id, step, values):
-        self.tensorboard_writer.add_scalars(id, values, step)
+    def log_step(self, name, step, values):
+        self.tensorboard_writer.add_scalars(name, values, step)
         self.tensorboard_writer.flush()
 
     def load_previous_values(self, start_epoch, values):
