@@ -33,9 +33,10 @@ parser.add_argument('--window-stride', default=.01, type=float, help='Window str
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
 parser.add_argument('--hidden-size', default=2048, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden-layers', default=2, type=int, help='Number of RNN layers')
+parser.add_argument('--dropout', default=0.5, type=float, help='Transformer Dropout')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
-parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
+parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max-norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 parser.add_argument('--learning-anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
@@ -169,6 +170,7 @@ if __name__ == '__main__':
                           noise_levels=(args.noise_min, args.noise_max))
 
         model = DeepSpeech(hidden_size=args.hidden_size,
+                           dropout=args.dropout,
                            nb_layers=args.hidden_layers,
                            labels=labels,
                            audio_conf=audio_conf)

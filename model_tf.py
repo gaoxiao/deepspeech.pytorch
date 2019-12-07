@@ -129,7 +129,7 @@ class Lookahead(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, labels="abc", hidden_size=768, nb_layers=5, audio_conf=None, context=20):
+    def __init__(self, labels="abc", hidden_size=2048, nb_layers=2, audio_conf=None, dropout=0.5):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -175,8 +175,11 @@ class DeepSpeech(nn.Module):
         )
         self.inference_softmax = InferenceBatchSoftmax()
 
-        self.transformer = nn.Transformer(d_model=rnn_input_size, num_encoder_layers=2, num_decoder_layers=2,
-                                          dropout=0.5)
+        self.transformer = nn.Transformer(d_model=rnn_input_size,
+                                          dim_feedforward=hidden_size,
+                                          num_encoder_layers=self.hidden_layers,
+                                          num_decoder_layers=self.hidden_layers,
+                                          dropout=dropout)
 
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
