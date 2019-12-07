@@ -24,6 +24,8 @@ def evaluate(test_loader, device, model, criterion, decoder, target_decoder, sav
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
     avg_loss = 0
+    corr = 0
+
     for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages = data
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
@@ -48,8 +50,11 @@ def evaluate(test_loader, device, model, criterion, decoder, target_decoder, sav
         loss_value = loss.item()
         avg_loss += loss_value
 
+        scores, idxs = hidden_out.max(1)
+        corr += torch.sum(idxs == targets)
+
     avg_loss /= len(test_loader)
-    return avg_loss, output_data
+    return avg_loss, output_data, corr.item()
 
 
 def evaluate_class(test_loader, device, model):

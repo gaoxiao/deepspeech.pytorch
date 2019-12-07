@@ -7,14 +7,14 @@ import time
 import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
-from apex import amp
 from torch.nn import CrossEntropyLoss
 
+from apex import amp
 from data.cp_data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
     DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import TensorBoardLogger
-from model_tf import DeepSpeech, supported_rnns
+from model_tf import DeepSpeech
 from test import evaluate
 from utils import reduce_tensor, check_loss
 
@@ -26,26 +26,38 @@ parser.add_argument('--val-manifest', metavar='DIR',
 parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch-size', default=20, type=int, help='Batch size for training')
 # TODO: revert workers to 4
-parser.add_argument('--num-workers', default=0, type=int, help='Number of workers used in data-loading')
-parser.add_argument('--labels-path', default='labels.json', help='Contains all characters for transcription')
-parser.add_argument('--window-size', default=.02, type=float, help='Window size for spectrogram in seconds')
-parser.add_argument('--window-stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
+parser.add_argument('--num-workers', default=0, type=int,
+                    help='Number of workers used in data-loading')
+parser.add_argument('--labels-path', default='labels.json',
+                    help='Contains all characters for transcription')
+parser.add_argument('--window-size', default=.02, type=float,
+                    help='Window size for spectrogram in seconds')
+parser.add_argument('--window-stride', default=.01, type=float,
+                    help='Window stride for spectrogram in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
 parser.add_argument('--hidden-size', default=2048, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden-layers', default=2, type=int, help='Number of RNN layers')
 parser.add_argument('--dropout', default=0.5, type=float, help='Transformer Dropout')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
-parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, help='initial learning rate')
+parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
+                    help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-parser.add_argument('--max-norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
-parser.add_argument('--learning-anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
-parser.add_argument('--silent', dest='silent', action='store_true', help='Turn off progress tracking per iteration')
-parser.add_argument('--checkpoint', dest='checkpoint', action='store_true', help='Enables checkpoint saving of model')
-parser.add_argument('--checkpoint-per-batch', default=0, type=int, help='Save checkpoint per batch. 0 means never save')
-parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
+parser.add_argument('--max-norm', default=400, type=int,
+                    help='Norm cutoff to prevent explosion of gradients')
+parser.add_argument('--learning-anneal', default=1.1, type=float,
+                    help='Annealing applied to learning rate every epoch')
+parser.add_argument('--silent', dest='silent', action='store_true',
+                    help='Turn off progress tracking per iteration')
+parser.add_argument('--checkpoint', dest='checkpoint', action='store_true',
+                    help='Enables checkpoint saving of model')
+parser.add_argument('--checkpoint-per-batch', default=0, type=int,
+                    help='Save checkpoint per batch. 0 means never save')
+parser.add_argument('--tensorboard', dest='tensorboard', action='store_true',
+                    help='Turn on tensorboard graphing')
 parser.add_argument('--log-dir', default='visualize/ds_tf', help='Location of tensorboard log')
-parser.add_argument('--log-params', dest='log_params', action='store_true', help='Log parameter values and gradients')
+parser.add_argument('--log-params', dest='log_params', action='store_true',
+                    help='Log parameter values and gradients')
 parser.add_argument('--id', default='Deepspeech_tf', help='Identifier for visdom/tensorboard run')
 parser.add_argument('--save-folder', default='models_tf/', help='Location to save epoch models')
 parser.add_argument('--model-path', default='models_tf/deepspeech_final.pth',
@@ -53,12 +65,14 @@ parser.add_argument('--model-path', default='models_tf/deepspeech_final.pth',
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='Finetune the model from checkpoint "continue_from"')
-parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
+parser.add_argument('--augment', dest='augment', action='store_true',
+                    help='Use random tempo and gain perturbations.')
 parser.add_argument('--noise-dir', default=None,
                     help='Directory to inject noise into audio. If default, noise Inject not added')
 parser.add_argument('--noise-prob', default=0.4, help='Probability of noise being added per sample')
 parser.add_argument('--noise-min', default=0.0,
-                    help='Minimum noise level to sample from. (1.0 means all noise, not original signal)', type=float)
+                    help='Minimum noise level to sample from. (1.0 means all noise, not original signal)',
+                    type=float)
 parser.add_argument('--noise-max', default=0.5,
                     help='Maximum noise levels to sample from. Maximum 1.0', type=float)
 parser.add_argument('--no-shuffle', dest='no_shuffle', action='store_true',
@@ -152,7 +166,8 @@ if __name__ == '__main__':
             else:
                 start_iter += 1
             avg_loss = int(package.get('avg_loss', 0))
-            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], \
+            loss_results, cer_results, wer_results = package['loss_results'], package[
+                'cer_results'], \
                                                      package['wer_results']
             best_wer = wer_results[start_epoch]
             if main_proc and args.tensorboard:  # Previous scores to tensorboard logs
@@ -176,9 +191,11 @@ if __name__ == '__main__':
                            audio_conf=audio_conf)
 
     decoder = GreedyDecoder(labels)
-    train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
+    train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
+                                       labels=labels,
                                        normalize=True, augment=args.augment)
-    test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
+    test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest,
+                                      labels=labels,
                                       normalize=True, augment=False)
     if not args.distributed:
         train_sampler = BucketingSampler(train_dataset, batch_size=args.batch_size)
@@ -272,19 +289,24 @@ if __name__ == '__main__':
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.6f} ({loss.avg:.6f})\t'.format(
-                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
+                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time,
+                    data_time=data_time, loss=losses))
 
             if args.tensorboard and main_proc:
-                tensorboard_logger.log_step(epoch * len(train_sampler) + i,
+                tensorboard_logger.log_step(tensorboard_logger.id + '_loss',
+                                            epoch * len(train_sampler) + i,
                                             {'loss': losses.val, 'avg_loss': losses.avg})
 
-            if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
-                file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
+            if args.checkpoint_per_batch > 0 and i > 0 and (
+                i + 1) % args.checkpoint_per_batch == 0 and main_proc:
+                file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (
+                save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
-                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
-                                                loss_results=loss_results,
-                                                val_loss_results=val_loss_results, avg_loss=avg_loss),
-                           file_path)
+                torch.save(
+                    DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
+                                         loss_results=loss_results,
+                                         val_loss_results=val_loss_results, avg_loss=avg_loss),
+                    file_path)
             del hidden_out
 
         avg_loss /= len(train_sampler)
@@ -296,16 +318,20 @@ if __name__ == '__main__':
 
         start_iter = 0  # Reset start iteration for next epoch
         with torch.no_grad():
-            val_avg_loss, output_data = evaluate(test_loader=test_loader,
-                                                 device=device,
-                                                 model=model,
-                                                 criterion=criterion,
-                                                 decoder=decoder,
-                                                 target_decoder=decoder)
+            val_avg_loss, output_data, corr = evaluate(test_loader=test_loader,
+                                                       device=device,
+                                                       model=model,
+                                                       criterion=criterion,
+                                                       decoder=decoder,
+                                                       target_decoder=decoder)
         loss_results[epoch] = avg_loss
         val_loss_results[epoch] = val_avg_loss
+        accuracy = float(corr) / len(test_dataset)
         print('Validation Summary Epoch: [{0}]\t'
-              'Average Val Loss {loss:.6f}\t'.format(epoch + 1, loss=val_avg_loss))
+              'Average Val Loss {loss:.6f}\tAccuracy {accu:.6f}\t'
+              .format(epoch + 1, loss=val_avg_loss, accu=accuracy))
+        tensorboard_logger.log_step(tensorboard_logger.id + '_accuracy', epoch,
+                                    {'accuracy': accuracy})
 
         values = {
             'loss_results': loss_results,
@@ -320,7 +346,8 @@ if __name__ == '__main__':
 
         if main_proc and args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch,
+                                            loss_results=loss_results,
                                             val_loss_results=val_loss_results),
                        file_path)
         # anneal lr
@@ -330,7 +357,8 @@ if __name__ == '__main__':
 
         if main_proc and (best_val_loss is None or best_val_loss > val_avg_loss):
             print("Found better validated model, saving to %s" % args.model_path)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch,
+                                            loss_results=loss_results,
                                             val_loss_results=val_loss_results)
                        , args.model_path)
             best_val_loss = val_avg_loss
