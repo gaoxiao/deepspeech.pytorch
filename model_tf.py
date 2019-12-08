@@ -141,6 +141,9 @@ class DeepSpeech(nn.Module):
         self.hidden_layers = nb_layers
         self.audio_conf = audio_conf or {}
         self.labels = labels
+        self.dropout = dropout
+        self.tf_decoder_output = tf_decoder_output
+        self.fc_layers = fc_layers
         # Transformer decoder T.
         self.out_l = tf_decoder_output
 
@@ -235,6 +238,9 @@ class DeepSpeech(nn.Module):
         model = cls(hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],
                     labels=package['labels'],
+                    dropout=package['dropout'],
+                    tf_decoder_output=package['tf_decoder_output'],
+                    fc_layers=package['fc_layers'],
                     audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
         # for x in model.rnns:
@@ -246,6 +252,9 @@ class DeepSpeech(nn.Module):
         model = cls(hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],
                     labels=package['labels'],
+                    dropout=package['dropout'],
+                    tf_decoder_output=package['tf_decoder_output'],
+                    fc_layers=package['fc_layers'],
                     audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
         return model
@@ -259,6 +268,9 @@ class DeepSpeech(nn.Module):
             'hidden_layers': model.hidden_layers,
             'audio_conf': model.audio_conf,
             'labels': model.labels,
+            'dropout': model.dropout,
+            'tf_decoder_output': model.tf_decoder_output,
+            'fc_layers': model.fc_layers,
             'state_dict': model.state_dict(),
         }
         if optimizer is not None:
