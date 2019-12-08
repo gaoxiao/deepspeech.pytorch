@@ -129,7 +129,8 @@ class Lookahead(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, labels="abc", hidden_size=2048, nb_layers=2, audio_conf=None, dropout=0.5):
+    def __init__(self, labels="abc", hidden_size=2048, nb_layers=2, audio_conf=None, dropout=0.5,
+                 tf_decoder_output=64, fc_layers=2):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -140,8 +141,11 @@ class DeepSpeech(nn.Module):
         self.hidden_layers = nb_layers
         self.audio_conf = audio_conf or {}
         self.labels = labels
+        self.dropout = dropout
+        self.tf_decoder_output = tf_decoder_output
+        self.fc_layers = fc_layers
         # Transformer decoder T.
-        self.out_l = 64
+        self.out_l = tf_decoder_output
 
         sample_rate = self.audio_conf.get("sample_rate", 16000)
         window_size = self.audio_conf.get("window_size", 0.02)
@@ -161,29 +165,43 @@ class DeepSpeech(nn.Module):
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32
 
-        h_size = rnn_input_size * self.out_l
-        self.fc = nn.Sequential(
-            nn.BatchNorm1d(h_size),
-            nn.Linear(h_size, 2048),
-            nn.BatchNorm1d(2048),
-            nn.ReLU(),
-            nn.Linear(2048, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            # nn.Dropout(p=0.2),
-            nn.Linear(1024, num_classes, bias=False),
-        )
-        self.inference_softmax = InferenceBatchSoftmax()
-
         self.transformer = nn.Transformer(d_model=rnn_input_size,
                                           dim_feedforward=hidden_size,
                                           num_encoder_layers=self.hidden_layers,
                                           num_decoder_layers=self.hidden_layers,
                                           dropout=dropout)
 
+        h_size = rnn_input_size * self.out_l
+
+        if fc_layers == 0:
+            self.fc = nn.Sequential(
+                nn.BatchNorm1d(h_size),
+                nn.Linear(h_size, num_classes, bias=False),
+            )
+        else:
+            layers = [nn.BatchNorm1d(h_size),
+                      nn.Linear(h_size, hidden_size),
+                      nn.BatchNorm1d(hidden_size),
+                      nn.ReLU()]
+            for i in range(fc_layers - 1):
+                layers.extend([nn.Linear(hidden_size, hidden_size),
+                               nn.BatchNorm1d(hidden_size),
+                               nn.ReLU()])
+            layers.append(nn.Linear(hidden_size, num_classes, bias=False))
+
+            self.fc = nn.Sequential(*layers)
+
+        self.inference_softmax = InferenceBatchSoftmax()
+
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
         output_lengths = self.get_seq_lens(lengths)
+        max_length = output_lengths.max()
+        # Calculate bool mask.
+        src_key_padding_mask = torch.arange(max_length).expand(len(output_lengths),
+                                                               max_length) > output_lengths.unsqueeze(1)
+        src_key_padding_mask = src_key_padding_mask.to(x).bool()
+
         x, _ = self.conv(x, output_lengths)
 
         sizes = x.size()
@@ -192,7 +210,7 @@ class DeepSpeech(nn.Module):
 
         tgt = torch.zeros((self.out_l, x.size()[1], x.size()[2])).to(x)
 
-        output = self.transformer(x, tgt)
+        output = self.transformer(x, tgt, src_key_padding_mask=src_key_padding_mask)
         output = output.squeeze(0)
         output = output.transpose(0, 1)  # NxTxH
         output = output.reshape(output.size()[0], -1)
@@ -220,6 +238,9 @@ class DeepSpeech(nn.Module):
         model = cls(hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],
                     labels=package['labels'],
+                    dropout=package['dropout'],
+                    tf_decoder_output=package['tf_decoder_output'],
+                    fc_layers=package['fc_layers'],
                     audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
         # for x in model.rnns:
@@ -231,6 +252,9 @@ class DeepSpeech(nn.Module):
         model = cls(hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],
                     labels=package['labels'],
+                    dropout=package['dropout'],
+                    tf_decoder_output=package['tf_decoder_output'],
+                    fc_layers=package['fc_layers'],
                     audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
         return model
@@ -244,6 +268,9 @@ class DeepSpeech(nn.Module):
             'hidden_layers': model.hidden_layers,
             'audio_conf': model.audio_conf,
             'labels': model.labels,
+            'dropout': model.dropout,
+            'tf_decoder_output': model.tf_decoder_output,
+            'fc_layers': model.fc_layers,
             'state_dict': model.state_dict(),
         }
         if optimizer is not None:
