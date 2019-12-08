@@ -193,6 +193,12 @@ class DeepSpeech(nn.Module):
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
         output_lengths = self.get_seq_lens(lengths)
+        max_length = output_lengths.max()
+        # Calculate bool mask.
+        src_key_padding_mask = torch.arange(max_length).expand(len(output_lengths),
+                                                               max_length) > output_lengths.unsqueeze(1)
+        src_key_padding_mask = src_key_padding_mask.to(x).bool()
+
         x, _ = self.conv(x, output_lengths)
 
         sizes = x.size()
@@ -201,7 +207,7 @@ class DeepSpeech(nn.Module):
 
         tgt = torch.zeros((self.out_l, x.size()[1], x.size()[2])).to(x)
 
-        output = self.transformer(x, tgt)
+        output = self.transformer(x, tgt, src_key_padding_mask=src_key_padding_mask)
         output = output.squeeze(0)
         output = output.transpose(0, 1)  # NxTxH
         output = output.reshape(output.size()[0], -1)
