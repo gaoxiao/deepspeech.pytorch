@@ -129,7 +129,8 @@ class Lookahead(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, labels="abc", hidden_size=2048, nb_layers=2, audio_conf=None, dropout=0.5):
+    def __init__(self, labels="abc", hidden_size=2048, nb_layers=2, audio_conf=None, dropout=0.5,
+                 tf_decoder_output=64, fc_layers=2):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -141,7 +142,7 @@ class DeepSpeech(nn.Module):
         self.audio_conf = audio_conf or {}
         self.labels = labels
         # Transformer decoder T.
-        self.out_l = 64
+        self.out_l = tf_decoder_output
 
         sample_rate = self.audio_conf.get("sample_rate", 16000)
         window_size = self.audio_conf.get("window_size", 0.02)
@@ -161,25 +162,33 @@ class DeepSpeech(nn.Module):
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32
 
-        h_size = rnn_input_size * self.out_l
-        self.fc = nn.Sequential(
-            nn.BatchNorm1d(h_size),
-            nn.Linear(h_size, 2048),
-            nn.BatchNorm1d(2048),
-            nn.ReLU(),
-            nn.Linear(2048, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            # nn.Dropout(p=0.2),
-            nn.Linear(1024, num_classes, bias=False),
-        )
-        self.inference_softmax = InferenceBatchSoftmax()
-
         self.transformer = nn.Transformer(d_model=rnn_input_size,
                                           dim_feedforward=hidden_size,
                                           num_encoder_layers=self.hidden_layers,
                                           num_decoder_layers=self.hidden_layers,
                                           dropout=dropout)
+
+        h_size = rnn_input_size * self.out_l
+
+        if fc_layers == 0:
+            self.fc = nn.Sequential(
+                nn.BatchNorm1d(h_size),
+                nn.Linear(h_size, num_classes, bias=False),
+            )
+        else:
+            layers = [nn.BatchNorm1d(h_size),
+                      nn.Linear(h_size, hidden_size),
+                      nn.BatchNorm1d(hidden_size),
+                      nn.ReLU()]
+            for i in range(fc_layers - 1):
+                layers.extend([nn.Linear(hidden_size, hidden_size),
+                               nn.BatchNorm1d(hidden_size),
+                               nn.ReLU()])
+            layers.append(nn.Linear(hidden_size, num_classes, bias=False))
+
+            self.fc = nn.Sequential(*layers)
+
+        self.inference_softmax = InferenceBatchSoftmax()
 
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()

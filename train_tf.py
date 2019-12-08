@@ -37,6 +37,8 @@ parser.add_argument('--window-stride', default=.01, type=float,
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
 parser.add_argument('--hidden-size', default=2048, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden-layers', default=2, type=int, help='Number of RNN layers')
+parser.add_argument('--tf-decoder-output', default=64, type=int, help='Number of RNN layers')
+parser.add_argument('--fc-layers', default=0, type=int, help='Number of RNN layers')
 parser.add_argument('--dropout', default=0.5, type=float, help='Transformer Dropout')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
@@ -186,6 +188,8 @@ if __name__ == '__main__':
                            dropout=args.dropout,
                            nb_layers=args.hidden_layers,
                            labels=labels,
+                           tf_decoder_output=args.tf_decoder_output,
+                           fc_layers=args.fc_layers,
                            audio_conf=audio_conf)
 
     decoder = GreedyDecoder(labels)
