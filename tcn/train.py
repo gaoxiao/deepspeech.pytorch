@@ -38,10 +38,11 @@ parser.add_argument('--window-stride', default=.01, type=float,
                     help='Window stride for spectrogram in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
 parser.add_argument('--hidden-size', default=2048, type=int, help='Hidden size of RNNs')
-parser.add_argument('--hidden-layers', default=2, type=int, help='Number of RNN layers')
-parser.add_argument('--tf-decoder-output', default=64, type=int, help='Number of RNN layers')
+parser.add_argument('--ksize', type=int, default=7, help='kernel size (default: 7)')
+parser.add_argument('--levels', type=int, default=8,help='# of levels (default: 8)')
+parser.add_argument('--nhid', type=int, default=128, help='number of hidden units per layer (default: 450)')
 parser.add_argument('--fc-layers', default=0, type=int, help='Number of RNN layers')
-parser.add_argument('--dropout', default=0.5, type=float, help='Transformer Dropout')
+parser.add_argument('--dropout', default=0.2, type=float, help='Transformer Dropout')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
 parser.add_argument('--lr', '--learning-rate', default=0.1, type=float, help='initial learning rate')
@@ -57,7 +58,7 @@ parser.add_argument('--checkpoint', dest='checkpoint', action='store_true',
                     help='Enables checkpoint saving of model')
 parser.add_argument('--checkpoint-per-batch', default=0, type=int,
                     help='Save checkpoint per batch. 0 means never save')
-parser.add_argument('--tensorboard', dest='tensorboard', action='store_true',
+parser.add_argument('--tensorboard', dest='tensorboard', action='store_false', default=True,
                     help='Turn on tensorboard graphing')
 parser.add_argument('--log-dir', default='visualize/ds', help='Location of tensorboard log')
 parser.add_argument('--log-params', dest='log_params', action='store_true',
@@ -188,10 +189,10 @@ if __name__ == '__main__':
 
         model = DeepSpeech(hidden_size=args.hidden_size,
                            dropout=args.dropout,
-                           nb_layers=args.hidden_layers,
                            labels=labels,
-                           tf_decoder_output=args.tf_decoder_output,
-                           fc_layers=args.fc_layers,
+                           levels=args.levels,
+                           ksize=args.ksize,
+                           nhid=args.nhid,
                            audio_conf=audio_conf)
 
     decoder = GreedyDecoder(labels)

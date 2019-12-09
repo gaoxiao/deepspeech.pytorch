@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from tcn.tcn_model import TemporalConvNet
+
 
 class SequenceWise(nn.Module):
     def __init__(self, module):
@@ -67,35 +69,9 @@ class InferenceBatchSoftmax(nn.Module):
             return input_
 
 
-class Lookahead(nn.Module):
-    # Wang et al 2016 - Lookahead Convolution Layer for Unidirectional Recurrent Neural Networks
-    # input shape - sequence, batch, feature - TxNxH
-    # output shape - same as input
-    def __init__(self, n_features, context):
-        super(Lookahead, self).__init__()
-        assert context > 0
-        self.context = context
-        self.n_features = n_features
-        self.pad = (0, self.context - 1)
-        self.conv = nn.Conv1d(self.n_features, self.n_features, kernel_size=self.context, stride=1,
-                              groups=self.n_features, padding=0, bias=None)
-
-    def forward(self, x):
-        x = x.transpose(0, 1).transpose(1, 2)
-        x = F.pad(x, pad=self.pad, value=0)
-        x = self.conv(x)
-        x = x.transpose(1, 2).transpose(0, 1).contiguous()
-        return x
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(' \
-               + 'n_features=' + str(self.n_features) \
-               + ', context=' + str(self.context) + ')'
-
-
 class DeepSpeech(nn.Module):
-    def __init__(self, labels="abc", hidden_size=2048, nb_layers=2, audio_conf=None, dropout=0.5,
-                 tf_decoder_output=64, fc_layers=2):
+    def __init__(self, labels="abc", hidden_size=2048, audio_conf=None, dropout=0.5,
+                 ksize=7, levels=8, nhid=450, fc_layers=2):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -103,14 +79,13 @@ class DeepSpeech(nn.Module):
             audio_conf = {}
         self.version = '0.0.1'
         self.hidden_size = hidden_size
-        self.hidden_layers = nb_layers
         self.audio_conf = audio_conf or {}
         self.labels = labels
-        self.dropout = dropout
-        self.tf_decoder_output = tf_decoder_output
+        self.dropout = 0.5
         self.fc_layers = fc_layers
-        # Transformer decoder T.
-        self.out_l = tf_decoder_output
+        self.ksize = ksize
+        self.levels = levels
+        self.nhid = nhid
 
         sample_rate = self.audio_conf.get("sample_rate", 16000)
         window_size = self.audio_conf.get("window_size", 0.02)
@@ -123,7 +98,7 @@ class DeepSpeech(nn.Module):
             nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), padding=(10, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
-            torch.nn.Dropout(dropout)
+            torch.nn.Dropout(self.dropout)
         ))
         # Based on above convolutions and spectrogram size using conv formula (W - F + 2P)/ S+1
         rnn_input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
@@ -131,23 +106,20 @@ class DeepSpeech(nn.Module):
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32
 
-        self.transformer = nn.Transformer(d_model=rnn_input_size,
-                                          dim_feedforward=hidden_size,
-                                          num_encoder_layers=self.hidden_layers,
-                                          num_decoder_layers=self.hidden_layers,
-                                          dropout=dropout)
+        channel_sizes = [self.nhid] * self.levels
+        # channel_sizes = [450] * 8
+        self.tcn = TemporalConvNet(rnn_input_size, channel_sizes, kernel_size=self.ksize, dropout=dropout)
 
-        h_size = rnn_input_size * self.out_l
-
+        h_size = channel_sizes[-1]
         if fc_layers == 0:
             self.fc = nn.Sequential(
-                torch.nn.Dropout(dropout),
+                torch.nn.Dropout(self.dropout),
                 nn.BatchNorm1d(h_size),
                 nn.Linear(h_size, num_classes, bias=False),
             )
         else:
             layers = [
-                torch.nn.Dropout(dropout),
+                torch.nn.Dropout(self.dropout),
                 nn.BatchNorm1d(h_size),
                 nn.Linear(h_size, hidden_size),
                 nn.BatchNorm1d(hidden_size),
@@ -174,15 +146,10 @@ class DeepSpeech(nn.Module):
         x, _ = self.conv(x, output_lengths)
 
         sizes = x.size()
-        x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])  # Collapse feature dimension
-        x = x.transpose(1, 2).transpose(0, 1).contiguous()  # TxNxH
+        x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])  # Collapse feature dimension, NxHxT
 
-        tgt = torch.zeros((self.out_l, x.size()[1], x.size()[2])).to(x)
-
-        output = self.transformer(x, tgt, src_key_padding_mask=src_key_padding_mask)
-        output = output.squeeze(0)
-        output = output.transpose(0, 1)  # NxTxH
-        output = output.reshape(output.size()[0], -1)
+        output = self.tcn(x)
+        output = output[:, :, -1]
 
         output = self.fc(output)
         output = self.inference_softmax(output)
@@ -205,10 +172,8 @@ class DeepSpeech(nn.Module):
     def load_model(cls, path):
         package = torch.load(path, map_location=lambda storage, loc: storage)
         model = cls(hidden_size=package['hidden_size'],
-                    nb_layers=package['hidden_layers'],
                     labels=package['labels'],
                     dropout=package['dropout'],
-                    tf_decoder_output=package['tf_decoder_output'],
                     fc_layers=package['fc_layers'],
                     audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
@@ -217,10 +182,8 @@ class DeepSpeech(nn.Module):
     @classmethod
     def load_model_package(cls, package):
         model = cls(hidden_size=package['hidden_size'],
-                    nb_layers=package['hidden_layers'],
                     labels=package['labels'],
                     dropout=package['dropout'],
-                    tf_decoder_output=package['tf_decoder_output'],
                     fc_layers=package['fc_layers'],
                     audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
@@ -232,11 +195,9 @@ class DeepSpeech(nn.Module):
         package = {
             'version': model.version,
             'hidden_size': model.hidden_size,
-            'hidden_layers': model.hidden_layers,
             'audio_conf': model.audio_conf,
             'labels': model.labels,
             'dropout': model.dropout,
-            'tf_decoder_output': model.tf_decoder_output,
             'fc_layers': model.fc_layers,
             'state_dict': model.state_dict(),
         }
