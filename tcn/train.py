@@ -60,11 +60,11 @@ parser.add_argument('--checkpoint-per-batch', default=0, type=int,
                     help='Save checkpoint per batch. 0 means never save')
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_false', default=True,
                     help='Turn on tensorboard graphing')
-parser.add_argument('--log-dir', default='visualize/ds', help='Location of tensorboard log')
+parser.add_argument('--log-dir', default='visualize/tcn', help='Location of tensorboard log')
 parser.add_argument('--log-params', dest='log_params', action='store_true',
                     help='Log parameter values and gradients')
 parser.add_argument('--id', required=True, help='Identifier for visdom/tensorboard run')
-parser.add_argument('--save-folder', default='models/', help='Location to save epoch models')
+parser.add_argument('--save-folder', default='models_tcn/', help='Location to save epoch models')
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='Finetune the model from checkpoint "continue_from"')
