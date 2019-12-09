@@ -2,21 +2,23 @@ import argparse
 import json
 import os
 import random
+import sys
 import time
 
+sys.path.append(os.getcwd())
 import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
+from apex import amp
 from torch.nn import CrossEntropyLoss
 
-from apex import amp
 from data.cp_data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, \
     DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import TensorBoardLogger
-from model_tf import DeepSpeech
-from test_tf import evaluate
-from utils import reduce_tensor, check_loss
+from transformer.utils import reduce_tensor, check_loss
+from transformer.model import DeepSpeech
+from transformer.test import evaluate
 
 parser = argparse.ArgumentParser(description='DeepSpeech transformer training')
 parser.add_argument('--train-manifest', metavar='DIR',
@@ -61,7 +63,7 @@ parser.add_argument('--log-dir', default='visualize/ds', help='Location of tenso
 parser.add_argument('--log-params', dest='log_params', action='store_true',
                     help='Log parameter values and gradients')
 parser.add_argument('--id', required=True, help='Identifier for visdom/tensorboard run')
-parser.add_argument('--save-folder', default='models_tf/', help='Location to save epoch models')
+parser.add_argument('--save-folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='Finetune the model from checkpoint "continue_from"')

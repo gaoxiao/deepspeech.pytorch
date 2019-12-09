@@ -1,7 +1,7 @@
 import torch
 import torch.distributed as dist
 
-from model_tf import DeepSpeech
+from transformer.model import DeepSpeech
 
 
 def reduce_tensor(tensor, world_size, reduce_op_max=False):

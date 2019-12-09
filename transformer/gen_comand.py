@@ -10,7 +10,7 @@ if __name__ == '__main__':
     fc_layers = arr[7]
     decoder_output = arr[8]
     cuda = int(id) % 3 + 1
-    cmd = 'CUDA_VISIBLE_DEVICES={cuda} python train_tf.py ' \
+    cmd = 'CUDA_VISIBLE_DEVICES={cuda} python transformer/train.py ' \
           '--tensorboard --cuda --lr={lr} --decay={decay} --dropout={dropout} ' \
           '--hidden-layers={hidden_layers} --hidden-size={hidden_size} ' \
           '--tf-decoder-output={decoder_output} --fc-layers={fc_layers} ' \

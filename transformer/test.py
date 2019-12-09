@@ -4,8 +4,8 @@ import torch
 from tqdm import tqdm
 
 from data.cp_data_loader import SpectrogramDataset, AudioDataLoader
-from opts_tf import add_decoder_args, add_inference_args
-from utils_tf import load_model
+from transformer.opts import add_decoder_args, add_inference_args
+from transformer.utils import load_model
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
 parser = add_inference_args(parser)
