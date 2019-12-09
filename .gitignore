@@ -107,3 +107,5 @@ data/*_dataset/
 
 data/audios/
 visualize/
+models_tf/
+visualize*/

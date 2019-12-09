@@ -1,17 +1,8 @@
 import math
-from collections import OrderedDict
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-
-supported_rnns = {
-    'lstm': nn.LSTM,
-    'rnn': nn.RNN,
-    'gru': nn.GRU
-}
-supported_rnns_inv = dict((v, k) for k, v in supported_rnns.items())
 
 
 class SequenceWise(nn.Module):
@@ -74,32 +65,6 @@ class InferenceBatchSoftmax(nn.Module):
             return F.softmax(input_, dim=-1)
         else:
             return input_
-
-
-class BatchRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, rnn_type=nn.LSTM, bidirectional=False, batch_norm=True):
-        super(BatchRNN, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.bidirectional = bidirectional
-        self.batch_norm = SequenceWise(nn.BatchNorm1d(input_size)) if batch_norm else None
-        self.rnn = rnn_type(input_size=input_size, hidden_size=hidden_size,
-                            bidirectional=bidirectional, bias=True)
-        self.num_directions = 2 if bidirectional else 1
-
-    def flatten_parameters(self):
-        self.rnn.flatten_parameters()
-
-    def forward(self, x, output_lengths):
-        if self.batch_norm is not None:
-            x = self.batch_norm(x)
-        x = nn.utils.rnn.pack_padded_sequence(x, output_lengths)
-        x, h = self.rnn(x)
-        x, _ = nn.utils.rnn.pad_packed_sequence(x)
-        if self.bidirectional:
-            x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxH*2) -> (TxNxH) by sum
-            h = h.sum(0)  # (2xNxH) -> (NxH) by sum
-        return x, h
 
 
 class Lookahead(nn.Module):
@@ -247,8 +212,6 @@ class DeepSpeech(nn.Module):
                     fc_layers=package['fc_layers'],
                     audio_conf=package['audio_conf'])
         model.load_state_dict(package['state_dict'])
-        # for x in model.rnns:
-        #     x.flatten_parameters()
         return model
 
     @classmethod
@@ -295,11 +258,12 @@ class DeepSpeech(nn.Module):
     @staticmethod
     def get_param_size(model):
         params = 0
-        for p in model.parameters():
+        for n, p in model.named_parameters():
             tmp = 1
             for x in p.size():
                 tmp *= x
             params += tmp
+            print('{}, shape: {}, size: {}'.format(n, p.size(), tmp))
         return params
 
 
@@ -318,8 +282,8 @@ if __name__ == '__main__':
     print("DeepSpeech version: ", model.version)
     print("")
     print("Recurrent Neural Network Properties")
-    print("  RNN Layers:       ", model.hidden_layers)
-    print("  RNN Size:         ", model.hidden_size)
+    print("  Hidden Layers:       ", model.hidden_layers)
+    print("  Hidden Size:         ", model.hidden_size)
     print("  Classes:          ", len(model.labels))
     print("")
     print("Model Features")

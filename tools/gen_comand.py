@@ -1,5 +1,5 @@
 if __name__ == '__main__':
-    input = '14	Transformer	0.03	1.00E-04	0.5	1024	2	2	16	6 + Mask	Best: 0.835																						'
+    input = '21	Transformer	0.03	1.00E-04	0.7	512	2	2	16	15																							'
     arr = input.split()
     id = arr[0]
     lr = arr[2]
@@ -11,11 +11,11 @@ if __name__ == '__main__':
     decoder_output = arr[8]
     cuda = int(id) % 3 + 1
     cmd = 'CUDA_VISIBLE_DEVICES={cuda} python train_tf.py ' \
-          '--tensorboard --cuda --lr={lr} --decay={decay} ' \
+          '--tensorboard --cuda --lr={lr} --decay={decay} --dropout={dropout} ' \
           '--hidden-layers={hidden_layers} --hidden-size={hidden_size} ' \
           '--tf-decoder-output={decoder_output} --fc-layers={fc_layers} ' \
           '--id={id}'.format(
-        cuda=cuda, lr=lr, decay=decay,
+        cuda=cuda, lr=lr, decay=decay, dropout=dropout,
         hidden_layers=hidden_layers, hidden_size=hidden_size,
         decoder_output=decoder_output, fc_layers=fc_layers, id=id)
     print(cmd)
