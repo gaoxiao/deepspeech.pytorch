@@ -157,7 +157,8 @@ class DeepSpeech(nn.Module):
             nn.Hardtanh(0, 20, inplace=True),
             nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), padding=(10, 5)),
             nn.BatchNorm2d(32),
-            nn.Hardtanh(0, 20, inplace=True)
+            nn.Hardtanh(0, 20, inplace=True),
+            torch.nn.Dropout(dropout)
         ))
         # Based on above convolutions and spectrogram size using conv formula (W - F + 2P)/ S+1
         rnn_input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
@@ -175,14 +176,17 @@ class DeepSpeech(nn.Module):
 
         if fc_layers == 0:
             self.fc = nn.Sequential(
+                torch.nn.Dropout(dropout),
                 nn.BatchNorm1d(h_size),
                 nn.Linear(h_size, num_classes, bias=False),
             )
         else:
-            layers = [nn.BatchNorm1d(h_size),
-                      nn.Linear(h_size, hidden_size),
-                      nn.BatchNorm1d(hidden_size),
-                      nn.ReLU()]
+            layers = [
+                torch.nn.Dropout(dropout),
+                nn.BatchNorm1d(h_size),
+                nn.Linear(h_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                nn.ReLU()]
             for i in range(fc_layers - 1):
                 layers.extend([nn.Linear(hidden_size, hidden_size),
                                nn.BatchNorm1d(hidden_size),
