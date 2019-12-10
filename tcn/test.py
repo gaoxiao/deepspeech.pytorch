@@ -1,4 +1,8 @@
 import argparse
+import os
+import sys
+
+sys.path.append(os.getcwd())
 
 import torch
 from sklearn.metrics import classification_report
