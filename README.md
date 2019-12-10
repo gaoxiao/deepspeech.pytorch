@@ -4,6 +4,34 @@ Implementation of DeepSpeech2 for PyTorch. Creates a network based on the [DeepS
 
 ## Installation
 
+### Local
+```
+pip install -r requirements.txt
+git clone --recursive https://github.com/NVIDIA/apex.git
+cd apex; pip install .
+```
+Download audio data from "data/url_labels.txt", then split the result to "data/train_manifest.csv", "data/val_manifest.csv", "data/test_manifest.csv"
+
+#### Run RNN model
+```
+python train.py --cuda --id=xxx
+```
+
+#### Run transformer model
+```
+python transformer/train.py --cuda --id=xxx
+```
+
+#### Run TCN model
+```
+python tcn/train.py --cuda --id=xxx
+```
+
+#### Bring up tensorboard
+```
+tensorboard --logdir visualize
+```
+
 ### Docker
 
 There is no official Dockerhub image, however a Dockerfile is provided to build on your own systems.
