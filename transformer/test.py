@@ -25,7 +25,6 @@ parser = add_decoder_args(parser)
 def evaluate(test_loader, device, model, criterion, decoder, target_decoder, save_output=False, verbose=False,
              half=False):
     model.eval()
-    total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
     avg_loss = 0
     corr = 0
@@ -39,8 +38,6 @@ def evaluate(test_loader, device, model, criterion, decoder, target_decoder, sav
         if half:
             inputs = inputs.half()
             targets = targets.half()
-        # unflatten targets
-        split_targets = []
 
         _, hidden, _ = model(inputs, input_sizes)
         hidden_out = hidden.float()  # ensure float32 for loss
@@ -126,9 +123,3 @@ if __name__ == '__main__':
 
     size = float(len(test_dataset))
     print(corr, size, corr / size)
-
-    # print('Test Summary \t'
-    #       'Average WER {wer:.3f}\t'
-    #       'Average CER {cer:.3f}\t'.format(wer=wer, cer=cer))
-    # if args.save_output is not None:
-    #     np.save(args.save_output, output_data)
